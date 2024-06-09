@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option csharp_namespace = "Tienda.Autor.Api";
+
+package greet;
+
+service ImageService {
+  rpc SaveImage (SaveImageRequest) returns (SaveImageResponse);
+}
+
+message SaveImageRequest {
+  string guid = 1;
+  string name = 2;
+  bytes image = 3;
+}
+
+message SaveImageResponse {
+  bool success = 1;
+  string message = 2;
+}
