@@ -6,6 +6,7 @@ package greet;
 
 service ImageService {
   rpc SaveImage (SaveImageRequest) returns (SaveImageResponse);
+  rpc ObtenerImagenPorGuid (GuidRequest) returns (ImagenResponse);
 }
 
 message SaveImageRequest {
@@ -17,4 +18,14 @@ message SaveImageRequest {
 message SaveImageResponse {
   bool success = 1;
   string message = 2;
+}
+
+message GuidRequest {
+  string guid = 1;
+}
+
+message ImagenResponse {
+  bytes image = 1;
+  bool success = 2;
+  string error_message = 3;
 }

@@ -86,7 +86,28 @@ app.get('/autores', async (req, res) => {
 app.get('/autores/:id', async (req, res) => {
     try {
         const autor = await getAutor(req.params.id);
-        res.json(autor);
+        // Verificar si se pudo obtener el autor
+        if (!autor) {
+            return res.status(404).send('Autor no encontrado');
+        }
+
+        // Consultar la imagen por GUID usando el servicio gRPC
+        client.ObtenerImagenPorGuid({ guid: autor.autorLibroId }, (error, imgResponse) => {
+            if (error) {
+                console.error('Error al obtener la imagen:', error);
+                return res.status(500).send('Error al obtener la imagen del autor');
+            }
+
+            if (imgResponse.success) {
+                // Si se obtiene la imagen con éxito, añadir la imagen al objeto del autor
+                autor.imagen = Buffer.from(imgResponse.image, 'base64').toString('base64');
+            } else {
+                console.error('La imagen no fue encontrada');
+            }
+
+            // Enviar la respuesta que contiene el autor con la imagen (si se encuentra)
+            res.json(autor);
+        });
     } catch (error) {
         res.status(500).send(error.message);
     }
@@ -103,41 +124,65 @@ app.post('/autores', async (req, res) => {
 
 // Configuración de Multer para manejar la carga de archivos
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.originalname);
-  }
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+        cb(null, file.originalname);
+    }
 });
 
 
 // Ruta para el servicio gRPC
 app.post('/autores/save-image', upload.single('image'), (req, res) => {
-  const { file } = req;
-  const { guid } = req.body;
+    const { file } = req;
+    const { guid } = req.body;
 
-  if (!file) {
-    return res.status(400).send({ success: false, message: 'No file uploaded' });
-  }
-
-  // Leer la imagen
-  const image_data = fs.readFileSync(file.path);
-
-  // Crear un mensaje de solicitud (request)
-  const request = {
-    guid: guid || 'some-guid',
-    name: file.originalname,
-    image: image_data
-  };
-
-  // Hacer la llamada al servicio gRPC
-  client.SaveImage(request, (error, response) => {
-    if (error) {
-      return res.status(500).send({ success: false, message: error.message });
+    if (!file) {
+        return res.status(400).send({ success: false, message: 'No file uploaded' });
     }
-    res.send(response);
-  });
+
+    // Leer la imagen
+    const image_data = fs.readFileSync(file.path);
+
+    // Crear un mensaje de solicitud (request)
+    const request = {
+        guid: guid || 'some-guid',
+        name: file.originalname,
+        image: image_data
+    };
+
+    // Hacer la llamada al servicio gRPC
+    client.SaveImage(request, (error, response) => {
+        if (error) {
+            return res.status(500).send({ success: false, message: error.message });
+        }
+        res.send(response);
+    });
+});
+
+
+// Ruta para obtener una imagen por GUID
+app.get('/autores/:guid/imagen', (req, res) => {
+    const guid = req.params.guid;
+
+    // Hacer la llamada al servicio gRPC para obtener la imagen por GUID
+    client.ObtenerImagenPorGuid({ guid }, (error, response) => {
+        if (error) {
+            return res.status(500).send({ success: false, message: error.message });
+        }
+
+        if (response.success) {
+            // Aquí puedes manejar la imagen obtenida desde gRPC
+            // Por ejemplo, podrías enviarla como respuesta o guardarla en algún lugar
+            const imageBuffer = Buffer.from(response.image, 'base64');
+            // Aquí puedes hacer lo que quieras con la imagen
+            // Por ejemplo, enviarla como respuesta
+            res.send(imageBuffer);
+        } else {
+            res.status(404).send({ success: false, message: 'Image not found' });
+        }
+    });
 });
 
 app.listen(PORT, () => {
